@@ -1,0 +1,21 @@
+name = input()
+n = int(input())
+
+print("hello", name)
+print("n + 2 =", n + 2)
+print("n / 2 =", n / 2)
+
+if n > 10:
+    print("big")
+elif n == 10:
+    print("ten")
+else:
+    print("small")
+
+i = 0
+while i < 3:
+    print("while", i)
+    i = i + 1
+
+for j in range(3):
+    print("for", j)
