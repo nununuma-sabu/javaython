@@ -87,3 +87,11 @@ source code
 ```
 
 現時点ではASTを直接実行するtree-walk interpreterです。
+
+## テスト
+
+```sh
+bash scripts/test.sh
+```
+
+`push` と `pull_request` では GitHub Actions の `CI` workflow が同じテストを実行します。
