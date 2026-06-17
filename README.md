@@ -7,6 +7,9 @@ Javaで実装するPython風の小さなインタプリタです。
 - 標準入力: `input()`
 - 標準出力: `print(...)`
 - 型: `int`, `float`, `str`, `bool`
+- リスト: `[]`, `[1, 2]`, 添字参照、`len(...)`
+- リスト内包表記: `[value * 2 for value in values]`, `[value for value in values if value > 0]`
+- リストメソッド: `append`, `pop`, `clear`, `remove`, `insert`, `extend`, `count`, `index`
 - 変数代入
 - 複合代入: `+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
 - 数値演算: `+`, `-`, `*`, `/`, `//`, `%`
@@ -74,6 +77,13 @@ print((5 & 3) | 8)
 x = 5
 x //= 2
 print(x)
+
+values = []
+values.append(1)
+values.append(2)
+print(values[0])
+print(len(values))
+print([value * 2 for value in values])
 ```
 
 ## 実装構成

@@ -253,18 +253,36 @@ class Parser {
 
     private Expr call() {
         Expr expr = primary();
-        if (expr instanceof Expr.Variable variable && match(TokenType.LEFT_PAREN)) {
-            // 現時点では「名前(...)」形式の呼び出しだけ対応する。
-            List<Expr> arguments = new ArrayList<>();
-            if (!check(TokenType.RIGHT_PAREN)) {
-                do {
-                    arguments.add(expression());
-                } while (match(TokenType.COMMA));
+        while (true) {
+            if (match(TokenType.LEFT_PAREN)) {
+                if (!(expr instanceof Expr.Variable variable)) {
+                    throw error(previous(), "Only named functions can be called.");
+                }
+                expr = new Expr.Call(variable.name(), finishArguments(TokenType.RIGHT_PAREN, "Expected ')' after arguments."));
+            } else if (match(TokenType.DOT)) {
+                Token method = consume(TokenType.IDENTIFIER, "Expected method name after '.'.");
+                consume(TokenType.LEFT_PAREN, "Expected '(' after method name.");
+                expr = new Expr.MethodCall(expr, method, finishArguments(TokenType.RIGHT_PAREN, "Expected ')' after method arguments."));
+            } else if (match(TokenType.LEFT_BRACKET)) {
+                Expr index = expression();
+                Token bracket = consume(TokenType.RIGHT_BRACKET, "Expected ']' after index.");
+                expr = new Expr.Index(expr, index, bracket);
+            } else {
+                break;
             }
-            consume(TokenType.RIGHT_PAREN, "Expected ')' after arguments.");
-            return new Expr.Call(variable.name(), arguments);
         }
         return expr;
+    }
+
+    private List<Expr> finishArguments(TokenType terminator, String message) {
+        List<Expr> arguments = new ArrayList<>();
+        if (!check(terminator)) {
+            do {
+                arguments.add(expression());
+            } while (match(TokenType.COMMA));
+        }
+        consume(terminator, message);
+        return arguments;
     }
 
     private Expr primary() {
@@ -284,6 +302,33 @@ class Parser {
         }
         if (match(TokenType.STRING)) {
             return new Expr.Literal(new PyStr((String) previous().literal()));
+        }
+        if (match(TokenType.LEFT_BRACKET)) {
+            List<Expr> elements = new ArrayList<>();
+            if (!check(TokenType.RIGHT_BRACKET)) {
+                Expr first = expression();
+                if (match(TokenType.FOR)) {
+                    Token variable = consume(TokenType.IDENTIFIER, "Expected loop variable name in list comprehension.");
+                    consume(TokenType.IN, "Expected 'in' after loop variable in list comprehension.");
+                    Expr iterable = expression();
+                    Expr condition = null;
+                    if (match(TokenType.IF)) {
+                        condition = expression();
+                    }
+                    consume(TokenType.RIGHT_BRACKET, "Expected ']' after list comprehension.");
+                    return new Expr.ListComprehension(first, variable, iterable, condition);
+                }
+
+                elements.add(first);
+                while (match(TokenType.COMMA)) {
+                    if (check(TokenType.RIGHT_BRACKET)) {
+                        break;
+                    }
+                    elements.add(expression());
+                }
+            }
+            consume(TokenType.RIGHT_BRACKET, "Expected ']' after list literal.");
+            return new Expr.ListLiteral(elements);
         }
         if (match(TokenType.IDENTIFIER)) {
             return new Expr.Variable(previous());

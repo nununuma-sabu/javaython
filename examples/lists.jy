@@ -1,0 +1,34 @@
+values = []
+values.append(1)
+values.append(2)
+values.append(3)
+print("values", values)
+print("len", len(values))
+print("first", values[0])
+print("last", values[-1])
+
+values.insert(1, 9)
+print("insert", values)
+print("pop", values.pop())
+print("after pop", values)
+values.remove(9)
+print("after remove", values)
+values.extend([4, 5])
+print("after extend", values)
+print("count", values.count(2))
+print("index", values.index(4))
+
+total = 0
+for value in values:
+    total += value
+print("total", total)
+
+evens = [value for value in values if value % 2 == 0]
+doubled = [value * 2 for value in values]
+from_range = [i + 1 for i in range(3)]
+print("evens", evens)
+print("doubled", doubled)
+print("from range", from_range)
+
+values.clear()
+print("clear", values)

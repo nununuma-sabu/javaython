@@ -1,6 +1,10 @@
 package javaython;
 
-sealed interface PyValue permits PyInt, PyFloat, PyStr, PyBool, PyNone {
+import java.util.ArrayList;
+import java.util.List;
+import java.util.StringJoiner;
+
+sealed interface PyValue permits PyInt, PyFloat, PyStr, PyBool, PyList, PyNone {
     // ifやwhileの条件で使う真偽値判定。
     boolean isTruthy();
 
@@ -57,6 +61,33 @@ record PyBool(boolean value) implements PyValue {
     @Override
     public String display() {
         return value ? "True" : "False";
+    }
+}
+
+record PyList(List<PyValue> values) implements PyValue {
+    PyList {
+        values = new ArrayList<>(values);
+    }
+
+    @Override
+    public boolean isTruthy() {
+        return !values.isEmpty();
+    }
+
+    @Override
+    public String display() {
+        StringJoiner joiner = new StringJoiner(", ", "[", "]");
+        for (PyValue value : values) {
+            joiner.add(elementDisplay(value));
+        }
+        return joiner.toString();
+    }
+
+    private String elementDisplay(PyValue value) {
+        if (value instanceof PyStr pyStr) {
+            return "'" + pyStr.value().replace("\\", "\\\\").replace("'", "\\'") + "'";
+        }
+        return value.display();
     }
 }
 

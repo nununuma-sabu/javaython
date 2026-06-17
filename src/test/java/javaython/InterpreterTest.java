@@ -13,6 +13,7 @@ public class InterpreterTest {
         test("input, if, while, for", InterpreterTest::testMvpFlow);
         test("operators", InterpreterTest::testOperators);
         test("augmented assignment", InterpreterTest::testAugmentedAssignment);
+        test("lists", InterpreterTest::testLists);
         test("runtime errors", InterpreterTest::testRuntimeErrors);
         System.out.println("Passed " + passed + " tests.");
     }
@@ -138,11 +139,71 @@ public class InterpreterTest {
                 """);
     }
 
+    private static void testLists() {
+        String source = """
+                values = []
+                values.append(1)
+                values.append(2)
+                values.append(3)
+                print("values", values)
+                print("len", len(values))
+                print("first", values[0])
+                print("last", values[-1])
+
+                values.insert(1, 9)
+                print("insert", values)
+                print("pop", values.pop())
+                print("after pop", values)
+                values.remove(9)
+                print("after remove", values)
+                values.extend([4, 5])
+                print("after extend", values)
+                print("count", values.count(2))
+                print("index", values.index(4))
+
+                total = 0
+                for value in values:
+                    total += value
+                print("total", total)
+
+                evens = [value for value in values if value % 2 == 0]
+                doubled = [value * 2 for value in values]
+                from_range = [i + 1 for i in range(3)]
+                print("evens", evens)
+                print("doubled", doubled)
+                print("from range", from_range)
+
+                values.clear()
+                print("clear", values)
+                """;
+
+        assertOutput(source, "", """
+                values [1, 2, 3]
+                len 3
+                first 1
+                last 3
+                insert [1, 9, 2, 3]
+                pop 3
+                after pop [1, 9, 2]
+                after remove [1, 2]
+                after extend [1, 2, 4, 5]
+                count 1
+                index 2
+                total 12
+                evens [2, 4]
+                doubled [2, 4, 8, 10]
+                from range [1, 2, 3]
+                clear []
+                """);
+    }
+
     private static void testRuntimeErrors() {
         assertErrorContains("x += 1\n", "Undefined variable 'x'.");
         assertErrorContains("print(1 // 0)\n", "Division by zero.");
         assertErrorContains("print(1 << -1)\n", "Negative shift count.");
         assertErrorContains("print(1.5 & 1)\n", "Expected an int.");
+        assertErrorContains("print([][0])\n", "List index out of range.");
+        assertErrorContains("values = []\nvalues.pop()\n", "Cannot pop from an empty list.");
     }
 
     private static void assertOutput(String source, String input, String expected) {

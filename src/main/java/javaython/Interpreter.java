@@ -2,6 +2,7 @@ package javaython;
 
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.StringJoiner;
@@ -67,12 +68,8 @@ class Interpreter {
 
     private void executeFor(Stmt.For stmt) {
         PyValue iterable = evaluate(stmt.iterable());
-        if (!(iterable instanceof PyInt count)) {
-            throw new JavaythonException("for loop currently expects range(n), where n is an int.");
-        }
-        // range(n)はInterpreter内では「0からn未満まで回す整数」として扱う。
-        for (long i = 0; i < count.value(); i++) {
-            environment.assign(stmt.name().lexeme(), new PyInt(i));
+        for (PyValue value : iterateValues(iterable)) {
+            environment.assign(stmt.name().lexeme(), value);
             executeBlock(stmt.body());
         }
     }
@@ -91,10 +88,41 @@ class Interpreter {
             case Expr.Binary binary -> evaluateBinary(binary);
             case Expr.Call call -> evaluateCall(call);
             case Expr.Grouping grouping -> evaluate(grouping.expression());
+            case Expr.Index index -> evaluateIndex(index);
+            case Expr.ListComprehension listComprehension -> evaluateListComprehension(listComprehension);
+            case Expr.ListLiteral listLiteral -> evaluateListLiteral(listLiteral);
             case Expr.Literal literal -> literal.value();
+            case Expr.MethodCall methodCall -> evaluateMethodCall(methodCall);
             case Expr.Unary unary -> evaluateUnary(unary);
             case Expr.Variable variable -> environment.get(variable.name());
         };
+    }
+
+    private PyValue evaluateListLiteral(Expr.ListLiteral listLiteral) {
+        List<PyValue> values = new ArrayList<>();
+        for (Expr element : listLiteral.elements()) {
+            values.add(evaluate(element));
+        }
+        return new PyList(values);
+    }
+
+    private PyValue evaluateListComprehension(Expr.ListComprehension listComprehension) {
+        List<PyValue> results = new ArrayList<>();
+        for (PyValue value : iterateValues(evaluate(listComprehension.iterable()))) {
+            environment.assign(listComprehension.variable().lexeme(), value);
+            if (listComprehension.condition() == null || evaluate(listComprehension.condition()).isTruthy()) {
+                results.add(evaluate(listComprehension.element()));
+            }
+        }
+        return new PyList(results);
+    }
+
+    private PyValue evaluateIndex(Expr.Index index) {
+        PyValue receiver = evaluate(index.receiver());
+        if (receiver instanceof PyList list) {
+            return list.values().get(normalizeIndex(index.bracket(), list.values().size(), evaluate(index.index())));
+        }
+        throw typeError(index.bracket(), "Only lists can be indexed.");
     }
 
     private PyValue evaluateCall(Expr.Call call) {
@@ -121,11 +149,87 @@ class Interpreter {
                 requireArity(call, args, 1);
                 yield new PyBool(args.get(0).isTruthy());
             }
+            case "len" -> {
+                requireArity(call, args, 1);
+                yield lengthOf(call.callee(), args.get(0));
+            }
             case "range" -> {
                 requireArity(call, args, 1);
                 yield toInt(args.get(0));
             }
             default -> throw new JavaythonException("Unknown function '" + call.callee().lexeme() + "'.");
+        };
+    }
+
+    private PyValue evaluateMethodCall(Expr.MethodCall call) {
+        PyValue receiver = evaluate(call.receiver());
+        List<PyValue> args = call.arguments().stream().map(this::evaluate).toList();
+        if (!(receiver instanceof PyList list)) {
+            throw typeError(call.method(), "Only lists have methods currently.");
+        }
+        return switch (call.method().lexeme()) {
+            case "append" -> {
+                requireArity(call.method(), args, 1);
+                list.values().add(args.get(0));
+                yield PyNone.INSTANCE;
+            }
+            case "pop" -> {
+                if (args.size() > 1) {
+                    throw arityError(call.method(), "0 or 1", args.size());
+                }
+                if (list.values().isEmpty()) {
+                    throw typeError(call.method(), "Cannot pop from an empty list.");
+                }
+                int index = args.isEmpty() ? list.values().size() - 1 : normalizeIndex(call.method(), list.values().size(), args.get(0));
+                yield list.values().remove(index);
+            }
+            case "clear" -> {
+                requireArity(call.method(), args, 0);
+                list.values().clear();
+                yield PyNone.INSTANCE;
+            }
+            case "remove" -> {
+                requireArity(call.method(), args, 1);
+                int index = indexOf(list.values(), args.get(0));
+                if (index < 0) {
+                    throw typeError(call.method(), "Value is not in list.");
+                }
+                list.values().remove(index);
+                yield PyNone.INSTANCE;
+            }
+            case "insert" -> {
+                requireArity(call.method(), args, 2);
+                int index = normalizeInsertIndex(call.method(), list.values().size(), args.get(0));
+                list.values().add(index, args.get(1));
+                yield PyNone.INSTANCE;
+            }
+            case "extend" -> {
+                requireArity(call.method(), args, 1);
+                if (!(args.get(0) instanceof PyList other)) {
+                    throw typeError(call.method(), "extend expects a list.");
+                }
+                list.values().addAll(other.values());
+                yield PyNone.INSTANCE;
+            }
+            case "count" -> {
+                requireArity(call.method(), args, 1);
+                long count = 0;
+                for (PyValue value : list.values()) {
+                    if (equalsValue(value, args.get(0))) {
+                        count++;
+                    }
+                }
+                yield new PyInt(count);
+            }
+            case "index" -> {
+                requireArity(call.method(), args, 1);
+                int index = indexOf(list.values(), args.get(0));
+                if (index < 0) {
+                    throw typeError(call.method(), "Value is not in list.");
+                }
+                yield new PyInt(index);
+            }
+            default -> throw typeError(call.method(), "Unknown list method '" + call.method().lexeme() + "'.");
         };
     }
 
@@ -205,6 +309,11 @@ class Interpreter {
     private PyValue add(Token operator, PyValue left, PyValue right) {
         if (left instanceof PyStr l && right instanceof PyStr r) {
             return new PyStr(l.value() + r.value());
+        }
+        if (left instanceof PyList l && right instanceof PyList r) {
+            List<PyValue> values = new ArrayList<>(l.values());
+            values.addAll(r.values());
+            return new PyList(values);
         }
         return numeric(operator, left, right, (a, b) -> a + b, (a, b) -> a + b);
     }
@@ -297,6 +406,61 @@ class Interpreter {
         throw typeError(operator, "Expected an int.");
     }
 
+    private PyInt lengthOf(Token token, PyValue value) {
+        if (value instanceof PyStr pyStr) {
+            return new PyInt(pyStr.value().length());
+        }
+        if (value instanceof PyList pyList) {
+            return new PyInt(pyList.values().size());
+        }
+        throw typeError(token, "len expects a str or list.");
+    }
+
+    private int normalizeIndex(Token token, int size, PyValue value) {
+        long rawIndex = asLong(token, value);
+        long normalized = rawIndex < 0 ? size + rawIndex : rawIndex;
+        if (normalized < 0 || normalized >= size) {
+            throw typeError(token, "List index out of range.");
+        }
+        return Math.toIntExact(normalized);
+    }
+
+    private int normalizeInsertIndex(Token token, int size, PyValue value) {
+        long rawIndex = asLong(token, value);
+        long normalized = rawIndex < 0 ? size + rawIndex : rawIndex;
+        if (normalized < 0) {
+            return 0;
+        }
+        if (normalized > size) {
+            return size;
+        }
+        return Math.toIntExact(normalized);
+    }
+
+    private int indexOf(List<PyValue> values, PyValue target) {
+        for (int i = 0; i < values.size(); i++) {
+            if (equalsValue(values.get(i), target)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private List<PyValue> iterateValues(PyValue iterable) {
+        if (iterable instanceof PyList list) {
+            return new ArrayList<>(list.values());
+        }
+        if (iterable instanceof PyInt count) {
+            List<PyValue> values = new ArrayList<>();
+            // range(n)はInterpreter内では「0からn未満まで回す整数」として扱う。
+            for (long i = 0; i < count.value(); i++) {
+                values.add(new PyInt(i));
+            }
+            return values;
+        }
+        throw new JavaythonException("Expected range(n) or a list.");
+    }
+
     private PyInt toInt(PyValue value) {
         if (value instanceof PyInt pyInt) {
             return pyInt;
@@ -351,6 +515,16 @@ class Interpreter {
         if (args.size() != arity) {
             throw new JavaythonException("Function '" + call.callee().lexeme() + "' expects " + arity + " argument(s).");
         }
+    }
+
+    private void requireArity(Token name, List<PyValue> args, int arity) {
+        if (args.size() != arity) {
+            throw arityError(name, Integer.toString(arity), args.size());
+        }
+    }
+
+    private JavaythonException arityError(Token name, String expected, int actual) {
+        return new JavaythonException("'" + name.lexeme() + "' expects " + expected + " argument(s), got " + actual + ".");
     }
 
     private JavaythonException typeError(Token token, String message) {

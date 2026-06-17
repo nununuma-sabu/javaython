@@ -70,6 +70,8 @@ class Lexer {
         switch (c) {
             case '(' -> addToken(TokenType.LEFT_PAREN);
             case ')' -> addToken(TokenType.RIGHT_PAREN);
+            case '[' -> addToken(TokenType.LEFT_BRACKET);
+            case ']' -> addToken(TokenType.RIGHT_BRACKET);
             case '+' -> addToken(match('=') ? TokenType.PLUS_EQUAL : TokenType.PLUS);
             case '-' -> addToken(match('=') ? TokenType.MINUS_EQUAL : TokenType.MINUS);
             case '*' -> addToken(match('=') ? TokenType.STAR_EQUAL : TokenType.STAR);
@@ -87,6 +89,7 @@ class Lexer {
             case '~' -> addToken(TokenType.TILDE);
             case ':' -> addToken(TokenType.COLON);
             case ',' -> addToken(TokenType.COMMA);
+            case '.' -> addToken(TokenType.DOT);
             case '=' -> addToken(match('=') ? TokenType.EQUAL_EQUAL : TokenType.EQUAL);
             case '!' -> {
                 if (match('=')) {
