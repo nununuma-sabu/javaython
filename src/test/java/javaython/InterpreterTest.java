@@ -14,6 +14,7 @@ public class InterpreterTest {
         test("operators", InterpreterTest::testOperators);
         test("augmented assignment", InterpreterTest::testAugmentedAssignment);
         test("lists", InterpreterTest::testLists);
+        test("tuples and dicts", InterpreterTest::testTuplesAndDicts);
         test("runtime errors", InterpreterTest::testRuntimeErrors);
         System.out.println("Passed " + passed + " tests.");
     }
@@ -204,6 +205,67 @@ public class InterpreterTest {
         assertErrorContains("print(1.5 & 1)\n", "Expected an int.");
         assertErrorContains("print([][0])\n", "List index out of range.");
         assertErrorContains("values = []\nvalues.pop()\n", "Cannot pop from an empty list.");
+        assertErrorContains("print((1,)[2])\n", "index out of range");
+        assertErrorContains("print({\"a\": 1}[\"b\"])\n", "Dict key not found.");
+    }
+
+    private static void testTuplesAndDicts() {
+        String source = """
+                empty_tuple = ()
+                single = (1,)
+                pair = (1, "two")
+                more = pair + (3,)
+                print("empty tuple", empty_tuple)
+                print("single tuple", single)
+                print("pair", pair)
+                print("more", more)
+                print("tuple len", len(more))
+                print("tuple first", more[0])
+                print("tuple last", more[-1])
+                print("tuple count", (1, 2, 1).count(1))
+                print("tuple index", more.index("two"))
+
+                scores = {}
+                scores.update({"alice": 10, "bob": 8})
+                print("scores", scores)
+                print("alice", scores["alice"])
+                print("missing", scores.get("carol", 0))
+                print("keys", scores.keys())
+                print("values", scores.values())
+                print("items", scores.items())
+
+                total = 0
+                for name in scores:
+                    total += scores[name]
+                print("dict total", total)
+
+                print("popped", scores.pop("bob"))
+                print("after pop", scores)
+                scores.clear()
+                print("after clear", scores)
+                """;
+
+        assertOutput(source, "", """
+                empty tuple ()
+                single tuple (1,)
+                pair (1, 'two')
+                more (1, 'two', 3)
+                tuple len 3
+                tuple first 1
+                tuple last 3
+                tuple count 2
+                tuple index 1
+                scores {'alice': 10, 'bob': 8}
+                alice 10
+                missing 0
+                keys ['alice', 'bob']
+                values [10, 8]
+                items [('alice', 10), ('bob', 8)]
+                dict total 18
+                popped 8
+                after pop {'alice': 10}
+                after clear {}
+                """);
     }
 
     private static void assertOutput(String source, String input, String expected) {

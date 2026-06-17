@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
 
-sealed interface PyValue permits PyInt, PyFloat, PyStr, PyBool, PyList, PyNone {
+sealed interface PyValue permits PyInt, PyFloat, PyStr, PyBool, PyList, PyTuple, PyDict, PyNone {
     // ifやwhileの条件で使う真偽値判定。
     boolean isTruthy();
 
@@ -78,12 +78,63 @@ record PyList(List<PyValue> values) implements PyValue {
     public String display() {
         StringJoiner joiner = new StringJoiner(", ", "[", "]");
         for (PyValue value : values) {
-            joiner.add(elementDisplay(value));
+            joiner.add(PyDisplay.repr(value));
         }
         return joiner.toString();
     }
+}
 
-    private String elementDisplay(PyValue value) {
+record PyTuple(List<PyValue> values) implements PyValue {
+    PyTuple {
+        values = List.copyOf(values);
+    }
+
+    @Override
+    public boolean isTruthy() {
+        return !values.isEmpty();
+    }
+
+    @Override
+    public String display() {
+        if (values.isEmpty()) {
+            return "()";
+        }
+        StringJoiner joiner = new StringJoiner(", ", "(", values.size() == 1 ? ",)" : ")");
+        for (PyValue value : values) {
+            joiner.add(PyDisplay.repr(value));
+        }
+        return joiner.toString();
+    }
+}
+
+record PyDict(List<PyDictEntry> entries) implements PyValue {
+    PyDict {
+        entries = new ArrayList<>(entries);
+    }
+
+    @Override
+    public boolean isTruthy() {
+        return !entries.isEmpty();
+    }
+
+    @Override
+    public String display() {
+        StringJoiner joiner = new StringJoiner(", ", "{", "}");
+        for (PyDictEntry entry : entries) {
+            joiner.add(PyDisplay.repr(entry.key()) + ": " + PyDisplay.repr(entry.value()));
+        }
+        return joiner.toString();
+    }
+}
+
+record PyDictEntry(PyValue key, PyValue value) {
+}
+
+final class PyDisplay {
+    private PyDisplay() {
+    }
+
+    static String repr(PyValue value) {
         if (value instanceof PyStr pyStr) {
             return "'" + pyStr.value().replace("\\", "\\\\").replace("'", "\\'") + "'";
         }

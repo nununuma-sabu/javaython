@@ -87,15 +87,25 @@ class Interpreter {
         return switch (expr) {
             case Expr.Binary binary -> evaluateBinary(binary);
             case Expr.Call call -> evaluateCall(call);
+            case Expr.DictLiteral dictLiteral -> evaluateDictLiteral(dictLiteral);
             case Expr.Grouping grouping -> evaluate(grouping.expression());
             case Expr.Index index -> evaluateIndex(index);
             case Expr.ListComprehension listComprehension -> evaluateListComprehension(listComprehension);
             case Expr.ListLiteral listLiteral -> evaluateListLiteral(listLiteral);
             case Expr.Literal literal -> literal.value();
             case Expr.MethodCall methodCall -> evaluateMethodCall(methodCall);
+            case Expr.TupleLiteral tupleLiteral -> evaluateTupleLiteral(tupleLiteral);
             case Expr.Unary unary -> evaluateUnary(unary);
             case Expr.Variable variable -> environment.get(variable.name());
         };
+    }
+
+    private PyValue evaluateDictLiteral(Expr.DictLiteral dictLiteral) {
+        List<PyDictEntry> entries = new ArrayList<>();
+        for (Expr.DictEntry entry : dictLiteral.entries()) {
+            putDictEntry(entries, evaluate(entry.key()), evaluate(entry.value()));
+        }
+        return new PyDict(entries);
     }
 
     private PyValue evaluateListLiteral(Expr.ListLiteral listLiteral) {
@@ -117,12 +127,31 @@ class Interpreter {
         return new PyList(results);
     }
 
+    private PyValue evaluateTupleLiteral(Expr.TupleLiteral tupleLiteral) {
+        List<PyValue> values = new ArrayList<>();
+        for (Expr element : tupleLiteral.elements()) {
+            values.add(evaluate(element));
+        }
+        return new PyTuple(values);
+    }
+
     private PyValue evaluateIndex(Expr.Index index) {
         PyValue receiver = evaluate(index.receiver());
         if (receiver instanceof PyList list) {
             return list.values().get(normalizeIndex(index.bracket(), list.values().size(), evaluate(index.index())));
         }
-        throw typeError(index.bracket(), "Only lists can be indexed.");
+        if (receiver instanceof PyTuple tuple) {
+            return tuple.values().get(normalizeIndex(index.bracket(), tuple.values().size(), evaluate(index.index())));
+        }
+        if (receiver instanceof PyDict dict) {
+            PyValue key = evaluate(index.index());
+            int entryIndex = dictIndexOf(dict.entries(), key);
+            if (entryIndex < 0) {
+                throw typeError(index.bracket(), "Dict key not found.");
+            }
+            return dict.entries().get(entryIndex).value();
+        }
+        throw typeError(index.bracket(), "Only lists, tuples, and dicts can be indexed.");
     }
 
     private PyValue evaluateCall(Expr.Call call) {
@@ -164,55 +193,65 @@ class Interpreter {
     private PyValue evaluateMethodCall(Expr.MethodCall call) {
         PyValue receiver = evaluate(call.receiver());
         List<PyValue> args = call.arguments().stream().map(this::evaluate).toList();
-        if (!(receiver instanceof PyList list)) {
-            throw typeError(call.method(), "Only lists have methods currently.");
+        if (receiver instanceof PyList list) {
+            return evaluateListMethod(call.method(), list, args);
         }
-        return switch (call.method().lexeme()) {
+        if (receiver instanceof PyTuple tuple) {
+            return evaluateTupleMethod(call.method(), tuple, args);
+        }
+        if (receiver instanceof PyDict dict) {
+            return evaluateDictMethod(call.method(), dict, args);
+        }
+        throw typeError(call.method(), "Only lists, tuples, and dicts have methods currently.");
+    }
+
+    private PyValue evaluateListMethod(Token method, PyList list, List<PyValue> args) {
+        return switch (method.lexeme()) {
             case "append" -> {
-                requireArity(call.method(), args, 1);
+                requireArity(method, args, 1);
                 list.values().add(args.get(0));
                 yield PyNone.INSTANCE;
             }
             case "pop" -> {
                 if (args.size() > 1) {
-                    throw arityError(call.method(), "0 or 1", args.size());
+                    throw arityError(method, "0 or 1", args.size());
                 }
                 if (list.values().isEmpty()) {
-                    throw typeError(call.method(), "Cannot pop from an empty list.");
+                    throw typeError(method, "Cannot pop from an empty list.");
                 }
-                int index = args.isEmpty() ? list.values().size() - 1 : normalizeIndex(call.method(), list.values().size(), args.get(0));
+                int index = args.isEmpty() ? list.values().size() - 1 : normalizeIndex(method, list.values().size(), args.get(0));
                 yield list.values().remove(index);
             }
             case "clear" -> {
-                requireArity(call.method(), args, 0);
+                requireArity(method, args, 0);
                 list.values().clear();
                 yield PyNone.INSTANCE;
             }
             case "remove" -> {
-                requireArity(call.method(), args, 1);
+                requireArity(method, args, 1);
                 int index = indexOf(list.values(), args.get(0));
                 if (index < 0) {
-                    throw typeError(call.method(), "Value is not in list.");
+                    throw typeError(method, "Value is not in list.");
                 }
                 list.values().remove(index);
                 yield PyNone.INSTANCE;
             }
             case "insert" -> {
-                requireArity(call.method(), args, 2);
-                int index = normalizeInsertIndex(call.method(), list.values().size(), args.get(0));
+                requireArity(method, args, 2);
+                int index = normalizeInsertIndex(method, list.values().size(), args.get(0));
                 list.values().add(index, args.get(1));
                 yield PyNone.INSTANCE;
             }
             case "extend" -> {
-                requireArity(call.method(), args, 1);
+                requireArity(method, args, 1);
                 if (!(args.get(0) instanceof PyList other)) {
-                    throw typeError(call.method(), "extend expects a list.");
+                    throw typeError(method, "extend expects a list.");
                 }
                 list.values().addAll(other.values());
                 yield PyNone.INSTANCE;
             }
             case "count" -> {
-                requireArity(call.method(), args, 1);
+                requireArity(method, args, 1);
                 long count = 0;
                 for (PyValue value : list.values()) {
                     if (equalsValue(value, args.get(0))) {
@@ -222,14 +261,103 @@ class Interpreter {
                 yield new PyInt(count);
             }
             case "index" -> {
-                requireArity(call.method(), args, 1);
+                requireArity(method, args, 1);
                 int index = indexOf(list.values(), args.get(0));
                 if (index < 0) {
-                    throw typeError(call.method(), "Value is not in list.");
+                    throw typeError(method, "Value is not in list.");
                 }
                 yield new PyInt(index);
             }
-            default -> throw typeError(call.method(), "Unknown list method '" + call.method().lexeme() + "'.");
+            default -> throw typeError(method, "Unknown list method '" + method.lexeme() + "'.");
+        };
+    }
+
+    private PyValue evaluateTupleMethod(Token method, PyTuple tuple, List<PyValue> args) {
+        return switch (method.lexeme()) {
+            case "count" -> {
+                requireArity(method, args, 1);
+                long count = 0;
+                for (PyValue value : tuple.values()) {
+                    if (equalsValue(value, args.get(0))) {
+                        count++;
+                    }
+                }
+                yield new PyInt(count);
+            }
+            case "index" -> {
+                requireArity(method, args, 1);
+                int index = indexOf(tuple.values(), args.get(0));
+                if (index < 0) {
+                    throw typeError(method, "Value is not in tuple.");
+                }
+                yield new PyInt(index);
+            }
+            default -> throw typeError(method, "Unknown tuple method '" + method.lexeme() + "'.");
+        };
+    }
+
+    private PyValue evaluateDictMethod(Token method, PyDict dict, List<PyValue> args) {
+        return switch (method.lexeme()) {
+            case "keys" -> {
+                requireArity(method, args, 0);
+                List<PyValue> values = new ArrayList<>();
+                for (PyDictEntry entry : dict.entries()) {
+                    values.add(entry.key());
+                }
+                yield new PyList(values);
+            }
+            case "values" -> {
+                requireArity(method, args, 0);
+                List<PyValue> values = new ArrayList<>();
+                for (PyDictEntry entry : dict.entries()) {
+                    values.add(entry.value());
+                }
+                yield new PyList(values);
+            }
+            case "items" -> {
+                requireArity(method, args, 0);
+                List<PyValue> values = new ArrayList<>();
+                for (PyDictEntry entry : dict.entries()) {
+                    values.add(new PyTuple(List.of(entry.key(), entry.value())));
+                }
+                yield new PyList(values);
+            }
+            case "get" -> {
+                if (args.isEmpty() || args.size() > 2) {
+                    throw arityError(method, "1 or 2", args.size());
+                }
+                int index = dictIndexOf(dict.entries(), args.get(0));
+                yield index >= 0 ? dict.entries().get(index).value() : (args.size() == 2 ? args.get(1) : PyNone.INSTANCE);
+            }
+            case "pop" -> {
+                if (args.isEmpty() || args.size() > 2) {
+                    throw arityError(method, "1 or 2", args.size());
+                }
+                int index = dictIndexOf(dict.entries(), args.get(0));
+                if (index >= 0) {
+                    yield dict.entries().remove(index).value();
+                }
+                if (args.size() == 2) {
+                    yield args.get(1);
+                }
+                throw typeError(method, "Dict key not found.");
+            }
+            case "clear" -> {
+                requireArity(method, args, 0);
+                dict.entries().clear();
+                yield PyNone.INSTANCE;
+            }
+            case "update" -> {
+                requireArity(method, args, 1);
+                if (!(args.get(0) instanceof PyDict other)) {
+                    throw typeError(method, "update expects a dict.");
+                }
+                for (PyDictEntry entry : other.entries()) {
+                    putDictEntry(dict.entries(), entry.key(), entry.value());
+                }
+                yield PyNone.INSTANCE;
+            }
+            default -> throw typeError(method, "Unknown dict method '" + method.lexeme() + "'.");
         };
     }
 
@@ -314,6 +442,11 @@ class Interpreter {
             List<PyValue> values = new ArrayList<>(l.values());
             values.addAll(r.values());
             return new PyList(values);
+        }
+        if (left instanceof PyTuple l && right instanceof PyTuple r) {
+            List<PyValue> values = new ArrayList<>(l.values());
+            values.addAll(r.values());
+            return new PyTuple(values);
         }
         return numeric(operator, left, right, (a, b) -> a + b, (a, b) -> a + b);
     }
@@ -413,7 +546,13 @@ class Interpreter {
         if (value instanceof PyList pyList) {
             return new PyInt(pyList.values().size());
         }
-        throw typeError(token, "len expects a str or list.");
+        if (value instanceof PyTuple pyTuple) {
+            return new PyInt(pyTuple.values().size());
+        }
+        if (value instanceof PyDict pyDict) {
+            return new PyInt(pyDict.entries().size());
+        }
+        throw typeError(token, "len expects a str, list, tuple, or dict.");
     }
 
     private int normalizeIndex(Token token, int size, PyValue value) {
@@ -446,9 +585,38 @@ class Interpreter {
         return -1;
     }
 
+    private int dictIndexOf(List<PyDictEntry> entries, PyValue key) {
+        for (int i = 0; i < entries.size(); i++) {
+            if (equalsValue(entries.get(i).key(), key)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void putDictEntry(List<PyDictEntry> entries, PyValue key, PyValue value) {
+        int index = dictIndexOf(entries, key);
+        PyDictEntry entry = new PyDictEntry(key, value);
+        if (index >= 0) {
+            entries.set(index, entry);
+        } else {
+            entries.add(entry);
+        }
+    }
+
     private List<PyValue> iterateValues(PyValue iterable) {
         if (iterable instanceof PyList list) {
             return new ArrayList<>(list.values());
+        }
+        if (iterable instanceof PyTuple tuple) {
+            return new ArrayList<>(tuple.values());
+        }
+        if (iterable instanceof PyDict dict) {
+            List<PyValue> values = new ArrayList<>();
+            for (PyDictEntry entry : dict.entries()) {
+                values.add(entry.key());
+            }
+            return values;
         }
         if (iterable instanceof PyInt count) {
             List<PyValue> values = new ArrayList<>();
@@ -458,7 +626,7 @@ class Interpreter {
             }
             return values;
         }
-        throw new JavaythonException("Expected range(n) or a list.");
+        throw new JavaythonException("Expected range(n), list, tuple, or dict.");
     }
 
     private PyInt toInt(PyValue value) {

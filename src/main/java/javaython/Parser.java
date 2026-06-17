@@ -330,15 +330,53 @@ class Parser {
             consume(TokenType.RIGHT_BRACKET, "Expected ']' after list literal.");
             return new Expr.ListLiteral(elements);
         }
+        if (match(TokenType.LEFT_BRACE)) {
+            return dictLiteral();
+        }
         if (match(TokenType.IDENTIFIER)) {
             return new Expr.Variable(previous());
         }
         if (match(TokenType.LEFT_PAREN)) {
-            Expr expr = expression();
-            consume(TokenType.RIGHT_PAREN, "Expected ')' after expression.");
-            return new Expr.Grouping(expr);
+            return parenthesized();
         }
         throw error(peek(), "Expected expression.");
+    }
+
+    private Expr dictLiteral() {
+        List<Expr.DictEntry> entries = new ArrayList<>();
+        if (!check(TokenType.RIGHT_BRACE)) {
+            do {
+                Expr key = expression();
+                consume(TokenType.COLON, "Expected ':' between dict key and value.");
+                Expr value = expression();
+                entries.add(new Expr.DictEntry(key, value));
+            } while (match(TokenType.COMMA) && !check(TokenType.RIGHT_BRACE));
+        }
+        consume(TokenType.RIGHT_BRACE, "Expected '}' after dict literal.");
+        return new Expr.DictLiteral(entries);
+    }
+
+    private Expr parenthesized() {
+        if (match(TokenType.RIGHT_PAREN)) {
+            return new Expr.TupleLiteral(List.of());
+        }
+
+        Expr first = expression();
+        if (!match(TokenType.COMMA)) {
+            consume(TokenType.RIGHT_PAREN, "Expected ')' after expression.");
+            return new Expr.Grouping(first);
+        }
+
+        List<Expr> elements = new ArrayList<>();
+        elements.add(first);
+        while (!check(TokenType.RIGHT_PAREN)) {
+            elements.add(expression());
+            if (!match(TokenType.COMMA)) {
+                break;
+            }
+        }
+        consume(TokenType.RIGHT_PAREN, "Expected ')' after tuple literal.");
+        return new Expr.TupleLiteral(elements);
     }
 
     private void skipNewlines() {

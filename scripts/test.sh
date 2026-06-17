@@ -12,3 +12,4 @@ java -cp out/main:out/test javaython.InterpreterTest
 printf 'Numa\n12\n' | java -cp out/main javaython.Main examples/mvp.jy
 java -cp out/main javaython.Main examples/operators.jy
 java -cp out/main javaython.Main examples/lists.jy
+java -cp out/main javaython.Main examples/tuples_dicts.jy

@@ -1,0 +1,32 @@
+empty_tuple = ()
+single = (1,)
+pair = (1, "two")
+more = pair + (3,)
+print("empty tuple", empty_tuple)
+print("single tuple", single)
+print("pair", pair)
+print("more", more)
+print("tuple len", len(more))
+print("tuple first", more[0])
+print("tuple last", more[-1])
+print("tuple count", (1, 2, 1).count(1))
+print("tuple index", more.index("two"))
+
+scores = {}
+scores.update({"alice": 10, "bob": 8})
+print("scores", scores)
+print("alice", scores["alice"])
+print("missing", scores.get("carol", 0))
+print("keys", scores.keys())
+print("values", scores.values())
+print("items", scores.items())
+
+total = 0
+for name in scores:
+    total += scores[name]
+print("dict total", total)
+
+print("popped", scores.pop("bob"))
+print("after pop", scores)
+scores.clear()
+print("after clear", scores)

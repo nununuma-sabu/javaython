@@ -10,6 +10,8 @@ Javaで実装するPython風の小さなインタプリタです。
 - リスト: `[]`, `[1, 2]`, 添字参照、`len(...)`
 - リスト内包表記: `[value * 2 for value in values]`, `[value for value in values if value > 0]`
 - リストメソッド: `append`, `pop`, `clear`, `remove`, `insert`, `extend`, `count`, `index`
+- タプル: `()`, `(1,)`, `(1, 2)`, 添字参照、`count`, `index`
+- 辞書: `{}`, `{"key": value}`, 添字参照、`get`, `keys`, `values`, `items`, `pop`, `clear`, `update`
 - 変数代入
 - 複合代入: `+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
 - 数値演算: `+`, `-`, `*`, `/`, `//`, `%`
@@ -84,6 +86,11 @@ values.append(2)
 print(values[0])
 print(len(values))
 print([value * 2 for value in values])
+
+pair = (1, "two")
+scores = {"alice": 10, "bob": 8}
+print(pair[1])
+print(scores["alice"])
 ```
 
 ## 実装構成
