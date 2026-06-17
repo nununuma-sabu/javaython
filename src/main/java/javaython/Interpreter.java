@@ -33,6 +33,7 @@ class Interpreter {
             case Stmt.For stmt -> executeFor(stmt);
             case Stmt.If stmt -> executeIf(stmt);
             case Stmt.Print stmt -> executePrint(stmt);
+            case Stmt.UnpackAssign stmt -> executeUnpackAssign(stmt);
             case Stmt.While stmt -> {
                 while (evaluate(stmt.condition()).isTruthy()) {
                     executeBlock(stmt.body());
@@ -47,6 +48,16 @@ class Interpreter {
         PyValue right = evaluate(stmt.value());
         PyValue value = evaluateAugmentedOperator(stmt.operator(), left, right);
         environment.assign(stmt.name().lexeme(), value);
+    }
+
+    private void executeUnpackAssign(Stmt.UnpackAssign stmt) {
+        List<PyValue> values = iterateValues(evaluate(stmt.value()));
+        if (values.size() != stmt.names().size()) {
+            throw new JavaythonException("Cannot unpack " + values.size() + " value(s) into " + stmt.names().size() + " variable(s).");
+        }
+        for (int i = 0; i < stmt.names().size(); i++) {
+            environment.assign(stmt.names().get(i).lexeme(), values.get(i));
+        }
     }
 
     private void executeBlock(List<Stmt> statements) {
@@ -155,6 +166,10 @@ class Interpreter {
     }
 
     private PyValue evaluateCall(Expr.Call call) {
+        if (call.callee().lexeme().equals("map")) {
+            return evaluateMap(call);
+        }
+
         List<PyValue> args = call.arguments().stream().map(this::evaluate).toList();
         // MVPの組み込み関数。ユーザー定義関数はまだ扱わない。
         return switch (call.callee().lexeme()) {
@@ -182,6 +197,10 @@ class Interpreter {
                 requireArity(call, args, 1);
                 yield lengthOf(call.callee(), args.get(0));
             }
+            case "list" -> {
+                requireArity(call, args, 1);
+                yield new PyList(iterateValues(args.get(0)));
+            }
             case "range" -> {
                 yield toRange(call.callee(), args);
             }
@@ -189,9 +208,38 @@ class Interpreter {
         };
     }
 
+    private PyValue evaluateMap(Expr.Call call) {
+        if (call.arguments().size() != 2) {
+            throw new JavaythonException("Function 'map' expects 2 argument(s).");
+        }
+        if (!(call.arguments().get(0) instanceof Expr.Variable function)) {
+            throw new JavaythonException("map currently expects a built-in function name as the first argument.");
+        }
+
+        PyValue iterable = evaluate(call.arguments().get(1));
+        List<PyValue> results = new ArrayList<>();
+        for (PyValue value : iterateValues(iterable)) {
+            results.add(applyBuiltinFunction(function.name(), value));
+        }
+        return new PyList(results);
+    }
+
+    private PyValue applyBuiltinFunction(Token function, PyValue value) {
+        return switch (function.lexeme()) {
+            case "int" -> toInt(value);
+            case "float" -> toFloat(value);
+            case "str" -> new PyStr(value.display());
+            case "bool" -> new PyBool(value.isTruthy());
+            default -> throw new JavaythonException("map does not support function '" + function.lexeme() + "'.");
+        };
+    }
+
     private PyValue evaluateMethodCall(Expr.MethodCall call) {
         PyValue receiver = evaluate(call.receiver());
         List<PyValue> args = call.arguments().stream().map(this::evaluate).toList();
+        if (receiver instanceof PyStr pyStr) {
+            return evaluateStringMethod(call.method(), pyStr, args);
+        }
         if (receiver instanceof PyList list) {
             return evaluateListMethod(call.method(), list, args);
         }
@@ -202,6 +250,32 @@ class Interpreter {
             return evaluateDictMethod(call.method(), dict, args);
         }
         throw typeError(call.method(), "Only lists, tuples, and dicts have methods currently.");
+    }
+
+    private PyValue evaluateStringMethod(Token method, PyStr string, List<PyValue> args) {
+        return switch (method.lexeme()) {
+            case "split" -> {
+                if (args.size() > 1) {
+                    throw arityError(method, "0 or 1", args.size());
+                }
+                String[] parts;
+                if (args.isEmpty()) {
+                    String trimmed = string.value().trim();
+                    parts = trimmed.isEmpty() ? new String[0] : trimmed.split("\\s+");
+                } else if (args.get(0) instanceof PyStr separator) {
+                    parts = string.value().split(java.util.regex.Pattern.quote(separator.value()), -1);
+                } else {
+                    throw typeError(method, "split separator must be a str.");
+                }
+
+                List<PyValue> values = new ArrayList<>();
+                for (String part : parts) {
+                    values.add(new PyStr(part));
+                }
+                yield new PyList(values);
+            }
+            default -> throw typeError(method, "Unknown str method '" + method.lexeme() + "'.");
+        };
     }
 
     private PyValue evaluateListMethod(Token method, PyList list, List<PyValue> args) {

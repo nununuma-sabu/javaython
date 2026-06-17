@@ -1,0 +1,7 @@
+a, b = map(int, input().split())
+S = list(map(int, input().split()))
+
+print("a", a)
+print("b", b)
+print("S", S)
+print("sum", a + b + S[0])

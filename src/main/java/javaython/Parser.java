@@ -34,6 +34,9 @@ class Parser {
         if (match(TokenType.FOR)) {
             return forStatement();
         }
+        if (check(TokenType.IDENTIFIER) && checkNext(TokenType.COMMA)) {
+            return unpackAssignment();
+        }
         if (check(TokenType.IDENTIFIER) && isAugmentedAssignment(checkNext())) {
             return augmentedAssignment();
         }
@@ -55,6 +58,18 @@ class Parser {
         Expr value = expression();
         consume(TokenType.NEWLINE, "Expected a newline after assignment.");
         return new Stmt.Assign(name, value);
+    }
+
+    private Stmt unpackAssignment() {
+        List<Token> names = new ArrayList<>();
+        names.add(consume(TokenType.IDENTIFIER, "Expected variable name."));
+        while (match(TokenType.COMMA)) {
+            names.add(consume(TokenType.IDENTIFIER, "Expected variable name after ','."));
+        }
+        consume(TokenType.EQUAL, "Expected '=' after assignment targets.");
+        Expr value = expression();
+        consume(TokenType.NEWLINE, "Expected a newline after assignment.");
+        return new Stmt.UnpackAssign(names, value);
     }
 
     private Stmt augmentedAssignment() {

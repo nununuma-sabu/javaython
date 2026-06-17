@@ -2,9 +2,14 @@ package javaython;
 
 import java.util.List;
 
-sealed interface Stmt permits Stmt.Assign, Stmt.AugAssign, Stmt.Expression, Stmt.For, Stmt.If, Stmt.Print, Stmt.While {
+sealed interface Stmt permits Stmt.Assign, Stmt.AugAssign, Stmt.Expression, Stmt.For, Stmt.If, Stmt.Print,
+        Stmt.UnpackAssign, Stmt.While {
     // 変数代入: name = value
     record Assign(Token name, Expr value) implements Stmt {
+    }
+
+    // アンパック代入: a, b = values
+    record UnpackAssign(List<Token> names, Expr value) implements Stmt {
     }
 
     // 複合代入: name += value, name //= value など。

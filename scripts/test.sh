@@ -13,3 +13,4 @@ printf 'Numa\n12\n' | java -cp out/main javaython.Main examples/mvp.jy
 java -cp out/main javaython.Main examples/operators.jy
 java -cp out/main javaython.Main examples/lists.jy
 java -cp out/main javaython.Main examples/tuples_dicts.jy
+printf '2 3\n10 20 30\n' | java -cp out/main javaython.Main examples/atcoder_input.jy

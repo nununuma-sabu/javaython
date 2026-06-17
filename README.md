@@ -6,6 +6,7 @@ Javaで実装するPython風の小さなインタプリタです。
 
 - 標準入力: `input()`
 - 標準出力: `print(...)`
+- AtCoder風入力: `a, b = map(int, input().split())`, `S = list(map(int, input().split()))`
 - 型: `int`, `float`, `str`, `bool`
 - リスト: `[]`, `[1, 2]`, 添字参照、`len(...)`
 - リスト内包表記: `[value * 2 for value in values]`, `[value for value in values if value > 0]`
@@ -119,6 +120,9 @@ pair = (1, "two")
 scores = {"alice": 10, "bob": 8}
 print(pair[1])
 print(scores["alice"])
+
+a, b = map(int, input().split())
+S = list(map(int, input().split()))
 ```
 
 ## 実装構成

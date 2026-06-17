@@ -11,6 +11,7 @@ public class InterpreterTest {
 
     public static void main(String[] args) {
         test("input, if, while, for", InterpreterTest::testMvpFlow);
+        test("atcoder input", InterpreterTest::testAtCoderInput);
         test("operators", InterpreterTest::testOperators);
         test("range", InterpreterTest::testRange);
         test("augmented assignment", InterpreterTest::testAugmentedAssignment);
@@ -95,6 +96,28 @@ public class InterpreterTest {
                 bit not -6
                 shift left 12
                 shift right 4
+                """);
+    }
+
+    private static void testAtCoderInput() {
+        String source = """
+                a, b = map(int, input().split())
+                S = list(map(int, input().split()))
+                words = input().split()
+
+                print("a", a)
+                print("b", b)
+                print("S", S)
+                print("words", words)
+                print("sum", a + b + S[0])
+                """;
+
+        assertOutput(source, "2 3\n10 20 30\nhello javaython\n", """
+                a 2
+                b 3
+                S [10, 20, 30]
+                words ['hello', 'javaython']
+                sum 15
                 """);
     }
 
@@ -233,6 +256,8 @@ public class InterpreterTest {
         assertErrorContains("print((1,)[2])\n", "index out of range");
         assertErrorContains("print({\"a\": 1}[\"b\"])\n", "Dict key not found.");
         assertErrorContains("print([i for i in range(1, 5, 0)])\n", "range step cannot be zero.");
+        assertErrorContains("a, b = [1]\n", "Cannot unpack 1 value(s) into 2 variable(s).");
+        assertErrorContains("print(map(sum, [1]))\n", "map does not support function 'sum'.");
     }
 
     private static void testRepl() {
