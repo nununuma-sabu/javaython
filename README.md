@@ -8,6 +8,7 @@ Javaで実装するPython風の小さなインタプリタです。
 - 標準出力: `print(...)`
 - AtCoder風入力: `a, b = map(int, input().split())`, `S = list(map(int, input().split()))`
 - 型: `int`, `float`, `str`, `bool`
+- `int` は `BigInteger` ベースの任意精度整数
 - リスト: `[]`, `[1, 2]`, 添字参照、`len(...)`
 - リスト内包表記: `[value * 2 for value in values]`, `[value for value in values if value > 0]`
 - リストメソッド: `append`, `pop`, `clear`, `remove`, `insert`, `extend`, `count`, `index`

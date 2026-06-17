@@ -1,5 +1,6 @@
 package javaython;
 
+import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -239,7 +240,7 @@ class Lexer {
         if (isFloat) {
             addToken(TokenType.NUMBER, Double.parseDouble(text));
         } else {
-            addToken(TokenType.NUMBER, Long.parseLong(text));
+            addToken(TokenType.NUMBER, new BigInteger(text));
         }
     }
 

@@ -13,6 +13,7 @@ public class InterpreterTest {
         test("input, if, while, for", InterpreterTest::testMvpFlow);
         test("atcoder input", InterpreterTest::testAtCoderInput);
         test("operators", InterpreterTest::testOperators);
+        test("big integers", InterpreterTest::testBigIntegers);
         test("range", InterpreterTest::testRange);
         test("augmented assignment", InterpreterTest::testAugmentedAssignment);
         test("lists", InterpreterTest::testLists);
@@ -118,6 +119,30 @@ public class InterpreterTest {
                 S [10, 20, 30]
                 words ['hello', 'javaython']
                 sum 15
+                """);
+    }
+
+    private static void testBigIntegers() {
+        String source = """
+                big = 9223372036854775808123456789
+                print("big", big)
+                print("add", big + 11)
+                print("mul", 12345678901234567890 * 10)
+                print("floor", -9223372036854775809 // 2)
+                print("mod", -9223372036854775809 % 2)
+                print("shift", 1 << 100)
+                a, b = map(int, input().split())
+                print("input add", a + b)
+                """;
+
+        assertOutput(source, "9223372036854775808 2\n", """
+                big 9223372036854775808123456789
+                add 9223372036854775808123456800
+                mul 123456789012345678900
+                floor -4611686018427387905
+                mod 1
+                shift 1267650600228229401496703205376
+                input add 9223372036854775810
                 """);
     }
 

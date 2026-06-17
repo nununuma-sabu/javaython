@@ -1,5 +1,6 @@
 package javaython;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
@@ -12,15 +13,19 @@ sealed interface PyValue permits PyInt, PyFloat, PyStr, PyBool, PyRange, PyList,
     String display();
 }
 
-record PyInt(long value) implements PyValue {
+record PyInt(BigInteger value) implements PyValue {
+    PyInt(long value) {
+        this(BigInteger.valueOf(value));
+    }
+
     @Override
     public boolean isTruthy() {
-        return value != 0;
+        return value.signum() != 0;
     }
 
     @Override
     public String display() {
-        return Long.toString(value);
+        return value.toString();
     }
 }
 
@@ -64,15 +69,19 @@ record PyBool(boolean value) implements PyValue {
     }
 }
 
-record PyRange(long start, long stop, long step) implements PyValue {
+record PyRange(BigInteger start, BigInteger stop, BigInteger step) implements PyValue {
+    PyRange(long start, long stop, long step) {
+        this(BigInteger.valueOf(start), BigInteger.valueOf(stop), BigInteger.valueOf(step));
+    }
+
     @Override
     public boolean isTruthy() {
-        return step > 0 ? start < stop : start > stop;
+        return step.signum() > 0 ? start.compareTo(stop) < 0 : start.compareTo(stop) > 0;
     }
 
     @Override
     public String display() {
-        if (start == 0 && step == 1) {
+        if (start.signum() == 0 && step.equals(BigInteger.ONE)) {
             return "range(0, " + stop + ")";
         }
         return "range(" + start + ", " + stop + ", " + step + ")";

@@ -1,5 +1,6 @@
 package javaython;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -310,7 +311,7 @@ class Parser {
         }
         if (match(TokenType.NUMBER)) {
             Object literal = previous().literal();
-            if (literal instanceof Long value) {
+            if (literal instanceof BigInteger value) {
                 return new Expr.Literal(new PyInt(value));
             }
             return new Expr.Literal(new PyFloat((Double) literal));
