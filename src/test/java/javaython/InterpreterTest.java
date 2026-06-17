@@ -15,6 +15,7 @@ public class InterpreterTest {
         test("augmented assignment", InterpreterTest::testAugmentedAssignment);
         test("lists", InterpreterTest::testLists);
         test("tuples and dicts", InterpreterTest::testTuplesAndDicts);
+        test("repl", InterpreterTest::testRepl);
         test("runtime errors", InterpreterTest::testRuntimeErrors);
         System.out.println("Passed " + passed + " tests.");
     }
@@ -209,6 +210,36 @@ public class InterpreterTest {
         assertErrorContains("print({\"a\": 1}[\"b\"])\n", "Dict key not found.");
     }
 
+    private static void testRepl() {
+        String input = """
+                x = 1
+                x += 2
+                print(x)
+                while x < 5:
+                    print(x)
+                    x += 1
+
+                print([i for i in range(3)])
+                exit()
+                """;
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8));
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream errorStream = new ByteArrayOutputStream();
+
+        Main.runRepl(
+                inputStream,
+                new PrintStream(outputStream, true, StandardCharsets.UTF_8),
+                new PrintStream(errorStream, true, StandardCharsets.UTF_8)
+        );
+
+        String output = outputStream.toString(StandardCharsets.UTF_8);
+        assertContains(output, "Javaython REPL. Type exit() or quit() to exit.");
+        assertContains(output, "3\n");
+        assertContains(output, "4\n");
+        assertContains(output, "[0, 1, 2]\n");
+        assertEquals("", errorStream.toString(StandardCharsets.UTF_8));
+    }
+
     private static void testTuplesAndDicts() {
         String source = """
                 empty_tuple = ()
@@ -270,6 +301,18 @@ public class InterpreterTest {
 
     private static void assertOutput(String source, String input, String expected) {
         String actual = run(source, input);
+        if (!expected.equals(actual)) {
+            throw new AssertionError("Expected:\n" + expected + "\nActual:\n" + actual);
+        }
+    }
+
+    private static void assertContains(String actual, String expectedPart) {
+        if (!actual.contains(expectedPart)) {
+            throw new AssertionError("Expected output to contain:\n" + expectedPart + "\nActual:\n" + actual);
+        }
+    }
+
+    private static void assertEquals(String expected, String actual) {
         if (!expected.equals(actual)) {
             throw new AssertionError("Expected:\n" + expected + "\nActual:\n" + actual);
         }

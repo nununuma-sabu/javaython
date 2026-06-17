@@ -29,6 +29,32 @@ javac -d out $(find src/main/java -name '*.java')
 java -cp out javaython.Main examples/mvp.jy
 ```
 
+引数なしで起動すると対話モードになります。
+
+```sh
+java -cp out javaython.Main
+```
+
+```text
+>>> values = [1, 2, 3]
+>>> print([value * 2 for value in values])
+[2, 4, 6]
+>>> exit()
+```
+
+`if` や `while` などのブロックは、空行で入力を確定します。
+
+```text
+>>> i = 0
+>>> while i < 3:
+...     print(i)
+...     i += 1
+...
+0
+1
+2
+```
+
 入力例:
 
 ```text
