@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
 
-sealed interface PyValue permits PyInt, PyFloat, PyStr, PyBool, PyList, PyTuple, PyDict, PyNone {
+sealed interface PyValue permits PyInt, PyFloat, PyStr, PyBool, PyRange, PyList, PyTuple, PyDict, PyNone {
     // ifやwhileの条件で使う真偽値判定。
     boolean isTruthy();
 
@@ -61,6 +61,21 @@ record PyBool(boolean value) implements PyValue {
     @Override
     public String display() {
         return value ? "True" : "False";
+    }
+}
+
+record PyRange(long start, long stop, long step) implements PyValue {
+    @Override
+    public boolean isTruthy() {
+        return step > 0 ? start < stop : start > stop;
+    }
+
+    @Override
+    public String display() {
+        if (start == 0 && step == 1) {
+            return "range(0, " + stop + ")";
+        }
+        return "range(" + start + ", " + stop + ", " + step + ")";
     }
 }
 

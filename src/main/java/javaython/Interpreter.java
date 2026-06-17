@@ -183,8 +183,7 @@ class Interpreter {
                 yield lengthOf(call.callee(), args.get(0));
             }
             case "range" -> {
-                requireArity(call, args, 1);
-                yield toInt(args.get(0));
+                yield toRange(call.callee(), args);
             }
             default -> throw new JavaythonException("Unknown function '" + call.callee().lexeme() + "'.");
         };
@@ -618,15 +617,52 @@ class Interpreter {
             }
             return values;
         }
+        if (iterable instanceof PyRange range) {
+            List<PyValue> values = new ArrayList<>();
+            if (range.step() > 0) {
+                for (long i = range.start(); i < range.stop(); i += range.step()) {
+                    values.add(new PyInt(i));
+                }
+            } else {
+                for (long i = range.start(); i > range.stop(); i += range.step()) {
+                    values.add(new PyInt(i));
+                }
+            }
+            return values;
+        }
         if (iterable instanceof PyInt count) {
             List<PyValue> values = new ArrayList<>();
-            // range(n)はInterpreter内では「0からn未満まで回す整数」として扱う。
+            // 古い内部表現との互換用。range(...)は現在PyRangeを返す。
             for (long i = 0; i < count.value(); i++) {
                 values.add(new PyInt(i));
             }
             return values;
         }
-        throw new JavaythonException("Expected range(n), list, tuple, or dict.");
+        throw new JavaythonException("Expected range, list, tuple, or dict.");
+    }
+
+    private PyRange toRange(Token token, List<PyValue> args) {
+        if (args.isEmpty() || args.size() > 3) {
+            throw arityError(token, "1 to 3", args.size());
+        }
+
+        long start;
+        long stop;
+        long step = 1;
+        if (args.size() == 1) {
+            start = 0;
+            stop = asLong(token, args.get(0));
+        } else {
+            start = asLong(token, args.get(0));
+            stop = asLong(token, args.get(1));
+            if (args.size() == 3) {
+                step = asLong(token, args.get(2));
+            }
+        }
+        if (step == 0) {
+            throw typeError(token, "range step cannot be zero.");
+        }
+        return new PyRange(start, stop, step);
     }
 
     private PyInt toInt(PyValue value) {

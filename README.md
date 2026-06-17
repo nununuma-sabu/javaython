@@ -21,6 +21,7 @@ Javaで実装するPython風の小さなインタプリタです。
 - `if`, `elif`, `else`
 - `while`
 - `for name in range(n)`
+- `range(stop)`, `range(start, stop)`, `range(start, stop, step)`
 
 ## 実行方法
 
@@ -112,6 +113,7 @@ values.append(2)
 print(values[0])
 print(len(values))
 print([value * 2 for value in values])
+print([i for i in range(2, 9, 3)])
 
 pair = (1, "two")
 scores = {"alice": 10, "bob": 8}

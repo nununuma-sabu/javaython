@@ -12,6 +12,7 @@ public class InterpreterTest {
     public static void main(String[] args) {
         test("input, if, while, for", InterpreterTest::testMvpFlow);
         test("operators", InterpreterTest::testOperators);
+        test("range", InterpreterTest::testRange);
         test("augmented assignment", InterpreterTest::testAugmentedAssignment);
         test("lists", InterpreterTest::testLists);
         test("tuples and dicts", InterpreterTest::testTuplesAndDicts);
@@ -141,6 +142,29 @@ public class InterpreterTest {
                 """);
     }
 
+    private static void testRange() {
+        String source = """
+                print("range stop", [i for i in range(4)])
+                print("range start stop", [i for i in range(2, 6)])
+                print("range step", [i for i in range(2, 9, 3)])
+                print("range negative", [i for i in range(5, 0, -2)])
+                print("range empty", [i for i in range(5, 0)])
+                total = 0
+                for i in range(1, 4):
+                    total += i
+                print("range total", total)
+                """;
+
+        assertOutput(source, "", """
+                range stop [0, 1, 2, 3]
+                range start stop [2, 3, 4, 5]
+                range step [2, 5, 8]
+                range negative [5, 3, 1]
+                range empty []
+                range total 6
+                """);
+    }
+
     private static void testLists() {
         String source = """
                 values = []
@@ -208,6 +232,7 @@ public class InterpreterTest {
         assertErrorContains("values = []\nvalues.pop()\n", "Cannot pop from an empty list.");
         assertErrorContains("print((1,)[2])\n", "index out of range");
         assertErrorContains("print({\"a\": 1}[\"b\"])\n", "Dict key not found.");
+        assertErrorContains("print([i for i in range(1, 5, 0)])\n", "range step cannot be zero.");
     }
 
     private static void testRepl() {
