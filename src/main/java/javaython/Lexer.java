@@ -70,10 +70,21 @@ class Lexer {
         switch (c) {
             case '(' -> addToken(TokenType.LEFT_PAREN);
             case ')' -> addToken(TokenType.RIGHT_PAREN);
-            case '+' -> addToken(TokenType.PLUS);
-            case '-' -> addToken(TokenType.MINUS);
-            case '*' -> addToken(TokenType.STAR);
-            case '/' -> addToken(TokenType.SLASH);
+            case '+' -> addToken(match('=') ? TokenType.PLUS_EQUAL : TokenType.PLUS);
+            case '-' -> addToken(match('=') ? TokenType.MINUS_EQUAL : TokenType.MINUS);
+            case '*' -> addToken(match('=') ? TokenType.STAR_EQUAL : TokenType.STAR);
+            case '/' -> {
+                if (match('/')) {
+                    addToken(match('=') ? TokenType.FLOOR_SLASH_EQUAL : TokenType.FLOOR_SLASH);
+                } else {
+                    addToken(match('=') ? TokenType.SLASH_EQUAL : TokenType.SLASH);
+                }
+            }
+            case '%' -> addToken(match('=') ? TokenType.PERCENT_EQUAL : TokenType.PERCENT);
+            case '&' -> addToken(match('=') ? TokenType.AMPERSAND_EQUAL : TokenType.AMPERSAND);
+            case '|' -> addToken(match('=') ? TokenType.PIPE_EQUAL : TokenType.PIPE);
+            case '^' -> addToken(match('=') ? TokenType.CARET_EQUAL : TokenType.CARET);
+            case '~' -> addToken(TokenType.TILDE);
             case ':' -> addToken(TokenType.COLON);
             case ',' -> addToken(TokenType.COMMA);
             case '=' -> addToken(match('=') ? TokenType.EQUAL_EQUAL : TokenType.EQUAL);
@@ -84,8 +95,28 @@ class Lexer {
                     throw error("Unexpected character '!'. Use 'not' or '!='.");
                 }
             }
-            case '>' -> addToken(match('=') ? TokenType.GREATER_EQUAL : TokenType.GREATER);
-            case '<' -> addToken(match('=') ? TokenType.LESS_EQUAL : TokenType.LESS);
+            case '>' -> {
+                if (match('=')) {
+                    addToken(TokenType.GREATER_EQUAL);
+                } else {
+                    if (match('>')) {
+                        addToken(match('=') ? TokenType.RIGHT_SHIFT_EQUAL : TokenType.RIGHT_SHIFT);
+                    } else {
+                        addToken(TokenType.GREATER);
+                    }
+                }
+            }
+            case '<' -> {
+                if (match('=')) {
+                    addToken(TokenType.LESS_EQUAL);
+                } else {
+                    if (match('<')) {
+                        addToken(match('=') ? TokenType.LEFT_SHIFT_EQUAL : TokenType.LEFT_SHIFT);
+                    } else {
+                        addToken(TokenType.LESS);
+                    }
+                }
+            }
             case ' ', '\t' -> {
             }
             case '#' -> {

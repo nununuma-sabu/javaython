@@ -34,6 +34,9 @@ class Parser {
         if (match(TokenType.FOR)) {
             return forStatement();
         }
+        if (check(TokenType.IDENTIFIER) && isAugmentedAssignment(checkNext())) {
+            return augmentedAssignment();
+        }
         if (check(TokenType.IDENTIFIER) && checkNext(TokenType.EQUAL)) {
             return assignment();
         }
@@ -52,6 +55,14 @@ class Parser {
         Expr value = expression();
         consume(TokenType.NEWLINE, "Expected a newline after assignment.");
         return new Stmt.Assign(name, value);
+    }
+
+    private Stmt augmentedAssignment() {
+        Token name = consume(TokenType.IDENTIFIER, "Expected variable name.");
+        Token operator = advance();
+        Expr value = expression();
+        consume(TokenType.NEWLINE, "Expected a newline after augmented assignment.");
+        return new Stmt.AugAssign(name, operator, value);
     }
 
     private Stmt printStatement() {
@@ -130,13 +141,23 @@ class Parser {
     }
 
     private Expr and() {
-        Expr expr = equality();
+        Expr expr = not();
         while (match(TokenType.AND)) {
             Token operator = previous();
-            Expr right = equality();
+            Expr right = not();
             expr = new Expr.Binary(expr, operator, right);
         }
         return expr;
+    }
+
+    private Expr not() {
+        // Pythonに近く、notはandより強く、比較演算より弱い優先順位にする。
+        if (match(TokenType.NOT)) {
+            Token operator = previous();
+            Expr right = not();
+            return new Expr.Unary(operator, right);
+        }
+        return equality();
     }
 
     private Expr equality() {
@@ -150,8 +171,50 @@ class Parser {
     }
 
     private Expr comparison() {
-        Expr expr = term();
+        Expr expr = bitwiseOr();
         while (match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL)) {
+            Token operator = previous();
+            Expr right = bitwiseOr();
+            expr = new Expr.Binary(expr, operator, right);
+        }
+        return expr;
+    }
+
+    private Expr bitwiseOr() {
+        // ビット演算はPythonの優先順位に合わせて |, ^, &, shift の順に分けて読む。
+        Expr expr = bitwiseXor();
+        while (match(TokenType.PIPE)) {
+            Token operator = previous();
+            Expr right = bitwiseXor();
+            expr = new Expr.Binary(expr, operator, right);
+        }
+        return expr;
+    }
+
+    private Expr bitwiseXor() {
+        Expr expr = bitwiseAnd();
+        while (match(TokenType.CARET)) {
+            Token operator = previous();
+            Expr right = bitwiseAnd();
+            expr = new Expr.Binary(expr, operator, right);
+        }
+        return expr;
+    }
+
+    private Expr bitwiseAnd() {
+        Expr expr = shift();
+        while (match(TokenType.AMPERSAND)) {
+            Token operator = previous();
+            Expr right = shift();
+            expr = new Expr.Binary(expr, operator, right);
+        }
+        return expr;
+    }
+
+    private Expr shift() {
+        // シフト演算は加減算より弱く、ビットANDより強い。
+        Expr expr = term();
+        while (match(TokenType.LEFT_SHIFT, TokenType.RIGHT_SHIFT)) {
             Token operator = previous();
             Expr right = term();
             expr = new Expr.Binary(expr, operator, right);
@@ -171,7 +234,7 @@ class Parser {
 
     private Expr factor() {
         Expr expr = unary();
-        while (match(TokenType.SLASH, TokenType.STAR)) {
+        while (match(TokenType.SLASH, TokenType.FLOOR_SLASH, TokenType.PERCENT, TokenType.STAR)) {
             Token operator = previous();
             Expr right = unary();
             expr = new Expr.Binary(expr, operator, right);
@@ -180,7 +243,7 @@ class Parser {
     }
 
     private Expr unary() {
-        if (match(TokenType.NOT, TokenType.MINUS)) {
+        if (match(TokenType.PLUS, TokenType.MINUS, TokenType.TILDE)) {
             Token operator = previous();
             Expr right = unary();
             return new Expr.Unary(operator, right);
@@ -261,6 +324,18 @@ class Parser {
 
     private boolean checkNext(TokenType type) {
         return current + 1 < tokens.size() && tokens.get(current + 1).type() == type;
+    }
+
+    private TokenType checkNext() {
+        return current + 1 < tokens.size() ? tokens.get(current + 1).type() : TokenType.EOF;
+    }
+
+    private boolean isAugmentedAssignment(TokenType type) {
+        return switch (type) {
+            case PLUS_EQUAL, MINUS_EQUAL, STAR_EQUAL, SLASH_EQUAL, FLOOR_SLASH_EQUAL, PERCENT_EQUAL,
+                    AMPERSAND_EQUAL, PIPE_EQUAL, CARET_EQUAL, LEFT_SHIFT_EQUAL, RIGHT_SHIFT_EQUAL -> true;
+            default -> false;
+        };
     }
 
     private Token advance() {

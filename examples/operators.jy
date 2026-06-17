@@ -1,0 +1,41 @@
+print("floor", 5 // 2)
+print("floor negative", -5 // 2)
+print("floor negative divisor", 5 // -2)
+print("mod", 5 % 2)
+print("mod negative", -5 % 2)
+print("mod negative divisor", 5 % -2)
+print("logic", True and not False)
+print("logic precedence", not 1 == 1)
+print("logic short", 0 or "fallback")
+print("bit and", 5 & 3)
+print("bit or", 5 | 2)
+print("bit xor", 5 ^ 3)
+print("bit not", ~5)
+print("shift left", 3 << 2)
+print("shift right", 16 >> 2)
+
+x = 5
+x += 3
+print("plus equal", x)
+x -= 2
+print("minus equal", x)
+x *= 4
+print("star equal", x)
+x /= 3
+print("slash equal", x)
+x = 5
+x //= 2
+print("floor equal", x)
+x %= 3
+print("mod equal", x)
+x = 6
+x &= 3
+print("and equal", x)
+x ^= 7
+print("xor equal", x)
+x <<= 4
+print("left shift equal", x)
+x |= 3
+print("or equal", x)
+x >>= 1
+print("right shift equal", x)

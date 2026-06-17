@@ -27,6 +27,7 @@ class Interpreter {
         // 文の種類ごとに実行方法を振り分ける。
         switch (statement) {
             case Stmt.Assign stmt -> environment.assign(stmt.name().lexeme(), evaluate(stmt.value()));
+            case Stmt.AugAssign stmt -> executeAugAssign(stmt);
             case Stmt.Expression stmt -> evaluate(stmt.expression());
             case Stmt.For stmt -> executeFor(stmt);
             case Stmt.If stmt -> executeIf(stmt);
@@ -37,6 +38,14 @@ class Interpreter {
                 }
             }
         }
+    }
+
+    private void executeAugAssign(Stmt.AugAssign stmt) {
+        // 複合代入は「現在値 op 右辺」を計算して同じ変数へ戻す。
+        PyValue left = environment.get(stmt.name());
+        PyValue right = evaluate(stmt.value());
+        PyValue value = evaluateAugmentedOperator(stmt.operator(), left, right);
+        environment.assign(stmt.name().lexeme(), value);
     }
 
     private void executeBlock(List<Stmt> statements) {
@@ -132,7 +141,14 @@ class Interpreter {
                 }
                 throw typeError(unary.operator(), "Unary '-' expects a number.");
             }
+            case PLUS -> {
+                if (right instanceof PyInt || right instanceof PyFloat) {
+                    yield right;
+                }
+                throw typeError(unary.operator(), "Unary '+' expects a number.");
+            }
             case NOT -> new PyBool(!right.isTruthy());
+            case TILDE -> new PyInt(~asLong(unary.operator(), right));
             default -> throw new IllegalStateException("Unexpected unary operator: " + unary.operator().type());
         };
     }
@@ -152,6 +168,13 @@ class Interpreter {
             case MINUS -> numeric(binary.operator(), left, right, (a, b) -> a - b, (a, b) -> a - b);
             case STAR -> numeric(binary.operator(), left, right, (a, b) -> a * b, (a, b) -> a * b);
             case SLASH -> divide(binary.operator(), left, right);
+            case FLOOR_SLASH -> floorDivide(binary.operator(), left, right);
+            case PERCENT -> modulo(binary.operator(), left, right);
+            case AMPERSAND -> bitwise(binary.operator(), left, right, (a, b) -> a & b);
+            case PIPE -> bitwise(binary.operator(), left, right, (a, b) -> a | b);
+            case CARET -> bitwise(binary.operator(), left, right, (a, b) -> a ^ b);
+            case LEFT_SHIFT -> shift(binary.operator(), left, right, true);
+            case RIGHT_SHIFT -> shift(binary.operator(), left, right, false);
             case GREATER -> compare(binary.operator(), left, right, (a, b) -> a > b);
             case GREATER_EQUAL -> compare(binary.operator(), left, right, (a, b) -> a >= b);
             case LESS -> compare(binary.operator(), left, right, (a, b) -> a < b);
@@ -159,6 +182,23 @@ class Interpreter {
             case EQUAL_EQUAL -> new PyBool(equalsValue(left, right));
             case BANG_EQUAL -> new PyBool(!equalsValue(left, right));
             default -> throw new IllegalStateException("Unexpected binary operator: " + binary.operator().type());
+        };
+    }
+
+    private PyValue evaluateAugmentedOperator(Token operator, PyValue left, PyValue right) {
+        return switch (operator.type()) {
+            case PLUS_EQUAL -> add(operator, left, right);
+            case MINUS_EQUAL -> numeric(operator, left, right, (a, b) -> a - b, (a, b) -> a - b);
+            case STAR_EQUAL -> numeric(operator, left, right, (a, b) -> a * b, (a, b) -> a * b);
+            case SLASH_EQUAL -> divide(operator, left, right);
+            case FLOOR_SLASH_EQUAL -> floorDivide(operator, left, right);
+            case PERCENT_EQUAL -> modulo(operator, left, right);
+            case AMPERSAND_EQUAL -> bitwise(operator, left, right, (a, b) -> a & b);
+            case PIPE_EQUAL -> bitwise(operator, left, right, (a, b) -> a | b);
+            case CARET_EQUAL -> bitwise(operator, left, right, (a, b) -> a ^ b);
+            case LEFT_SHIFT_EQUAL -> shift(operator, left, right, true);
+            case RIGHT_SHIFT_EQUAL -> shift(operator, left, right, false);
+            default -> throw new IllegalStateException("Unexpected augmented assignment operator: " + operator.type());
         };
     }
 
@@ -175,6 +215,57 @@ class Interpreter {
             throw typeError(operator, "Division by zero.");
         }
         return new PyFloat(asDouble(operator, left) / divisor);
+    }
+
+    private PyValue floorDivide(Token operator, PyValue left, PyValue right) {
+        // // は床除算。負数でもPythonと同じく小さい整数方向へ丸める。
+        if (left instanceof PyInt l && right instanceof PyInt r) {
+            if (r.value() == 0) {
+                throw typeError(operator, "Division by zero.");
+            }
+            return new PyInt(Math.floorDiv(l.value(), r.value()));
+        }
+
+        double divisor = asDouble(operator, right);
+        if (divisor == 0.0) {
+            throw typeError(operator, "Division by zero.");
+        }
+        return new PyInt((long) Math.floor(asDouble(operator, left) / divisor));
+    }
+
+    private PyValue modulo(Token operator, PyValue left, PyValue right) {
+        // % は床除算と対応する剰余にするため、負数でも除数と同じ符号になる。
+        if (left instanceof PyInt l && right instanceof PyInt r) {
+            if (r.value() == 0) {
+                throw typeError(operator, "Modulo by zero.");
+            }
+            return new PyInt(Math.floorMod(l.value(), r.value()));
+        }
+
+        double divisor = asDouble(operator, right);
+        if (divisor == 0.0) {
+            throw typeError(operator, "Modulo by zero.");
+        }
+        double dividend = asDouble(operator, left);
+        return new PyFloat(dividend - Math.floor(dividend / divisor) * divisor);
+    }
+
+    private PyValue bitwise(Token operator, PyValue left, PyValue right, LongBinary longOp) {
+        // ビット演算はMVPではint同士だけを受け付ける。
+        return new PyInt(longOp.apply(asLong(operator, left), asLong(operator, right)));
+    }
+
+    private PyValue shift(Token operator, PyValue left, PyValue right, boolean leftShift) {
+        // Javaのシフトは大きすぎる桁数を丸めるため、先に明示的に弾く。
+        long amount = asLong(operator, right);
+        if (amount < 0) {
+            throw typeError(operator, "Negative shift count.");
+        }
+        if (amount > Integer.MAX_VALUE) {
+            throw typeError(operator, "Shift count is too large.");
+        }
+        long value = asLong(operator, left);
+        return new PyInt(leftShift ? value << amount : value >> amount);
     }
 
     private PyValue numeric(Token operator, PyValue left, PyValue right, LongBinary longOp, DoubleBinary doubleOp) {
@@ -197,6 +288,13 @@ class Interpreter {
             return pyFloat.value();
         }
         throw typeError(operator, "Expected a number.");
+    }
+
+    private long asLong(Token operator, PyValue value) {
+        if (value instanceof PyInt pyInt) {
+            return pyInt.value();
+        }
+        throw typeError(operator, "Expected an int.");
     }
 
     private PyInt toInt(PyValue value) {
